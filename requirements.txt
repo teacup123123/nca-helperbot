@@ -1,0 +1,4 @@
+requests
+line-bot-sdk
+flask
+pyngrok
