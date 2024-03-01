@@ -31,8 +31,8 @@ from linebot.v3.webhooks import (
 
 app = Flask(__name__)
 
-configuration = Configuration(access_token=line_chan_acctoken)
-handler = WebhookHandler(line_chan_secret)
+my_line_config = Configuration(access_token=line_chan_acctoken)
+my_line_handler = WebhookHandler(line_chan_secret)
 
 
 @app.route("/", methods=['POST'])
@@ -50,7 +50,7 @@ def callback():
 
     # handle webhook body
     try:
-        handler.handle(body, signature)
+        my_line_handler.handle(body, signature)
     except InvalidSignatureError:
         app.logger.info("Invalid signature. Please check your channel access token/channel secret.")
         abort(400)
@@ -58,10 +58,10 @@ def callback():
     return 'OK'
 
 
-@handler.add(MessageEvent, message=TextMessageContent)
+@my_line_handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
     print('event triggered')
-    with ApiClient(configuration) as api_client:
+    with ApiClient(my_line_config) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message_with_http_info(
             ReplyMessageRequest(
