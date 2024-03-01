@@ -2,3 +2,8 @@ requests
 line-bot-sdk
 flask
 pyngrok
+google-api-python-client
+oauth2client
+gspread
+google-generativeai
+pillow

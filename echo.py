@@ -60,13 +60,13 @@ def callback():
 
 @my_line_handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event):
-    print('event triggered')
+    print(f'event triggered {event}')
     with ApiClient(my_line_config) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message_with_http_info(
             ReplyMessageRequest(
                 reply_token=event.reply_token,
-                messages=[TextMessage(text=event.message.text)]
+                messages=[TextMessage(text=event.message.text, quoteToken=event.message.quote_token)]
             )
         )
 

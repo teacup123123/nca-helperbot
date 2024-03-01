@@ -10,6 +10,7 @@ line_chan_secret = _creds['line_chan_secret']
 ngrok_token = _creds['ngrok_token']
 public_url = _creds['public_url']
 private_port = _creds['private_port']
+gai_apikey = _creds['gai_apikey']
 
 if __name__ == '__main__':
     print(_creds)
