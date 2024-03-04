@@ -7,3 +7,5 @@ oauth2client
 gspread
 google-generativeai
 pillow
+google-cloud-vision
+waitress
