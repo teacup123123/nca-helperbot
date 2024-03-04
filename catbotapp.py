@@ -21,7 +21,8 @@ from linebot.v3.messaging import (
 )
 from linebot.v3.webhooks import (
     MessageEvent,
-    TextMessageContent
+    TextMessageContent,
+    ImageMessageContent
 )
 
 app = Flask(__name__)
@@ -55,21 +56,21 @@ def callback():
 import catbot
 
 palette_Emojis = {
+    '(moon sunglasses)': Emoji(product_id='5ac1bfd5040ab15980c9b435', emoji_id='021'),
     '(cony cry)': Emoji(product_id='5ac1bfd5040ab15980c9b435', emoji_id='046'),
     '(moon halo)': Emoji(product_id='5ac1bfd5040ab15980c9b435', emoji_id='025'),
     '(heart)': Emoji(product_id='5ac1bfd5040ab15980c9b435', emoji_id='215'),
 }
 
 
-@my_line_handler.add(MessageEvent, message=TextMessageContent)
-def handle_message(event):
+def handle_msg(event):
     uid = event.source.user_id
     if uid not in catbot.userbase:
         cbot = catbot.userbase[uid] = catbot.catbot()
     else:
         cbot = catbot.userbase[uid]
 
-    _, reply = cbot.handle(event.message.text)
+    _, reply = cbot.handle(event.message.text if event.message.type == 'text' else 'IMG', msgid=event.message.id)
     catbot.userbase[uid] = cbot  # force save
 
     reply: str
@@ -101,6 +102,16 @@ def handle_message(event):
                                    )
                                ])
         )
+
+
+@my_line_handler.add(MessageEvent, message=ImageMessageContent)
+def handle_img_message(event):
+    return handle_msg(event)
+
+
+@my_line_handler.add(MessageEvent, message=TextMessageContent)
+def handle_txt_message(event):
+    return handle_msg(event)
 
 
 if __name__ == '__main__':
