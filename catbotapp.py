@@ -1,4 +1,5 @@
 import re
+import time
 
 from credentials import *
 from ngrok_autolaunch import *
@@ -116,11 +117,38 @@ def handle_txt_message(event):
     return handle_msg(event)
 
 
+from gcredentials import client
+import time
+
+
+# from datetime import datetime
+
+def subscribe():
+    ans = client.http_client.request(
+        method='POST',
+        endpoint='https://www.googleapis.com/drive/v3/files/1zmv-m-raCD8itLru9WxgEkdhZlmNZYm2-ud9fegWQnk/watch',
+        json={
+            "id": "holiday_form_watch",
+            "type": "web_hook",
+            "address": cat_tunnel.public_url + '/filewatch',
+            'expiration': int(time.time() * 1000) + 60 * 60 * 12
+        }
+    )
+    return ans
+
+
+@app.route("/filewatch", methods=['GET', 'POST'])
+def holiday_form_watcher():
+    # get request body as text
+    body = request.get_data(as_text=True)
+    print(f'holiday_watcher got {body}')
+    return 'OK'
+
+
 if __name__ == '__main__':
+    subscription = subscribe()
     from waitress import serve
+
     print(f'serving at port {cat_tunnel.localport}')
     serve(app, host="0.0.0.0", port=cat_tunnel.localport)
     # app.run(host='0.0.0.0', port=private_port)
-
-# curl -v -X GET https://api-data.line.me/v2/bot/message/{messageId}/content \
-# -H 'Authorization: Bearer {channel access token}'
