@@ -24,7 +24,6 @@ class file_backed_dict(dict):
             self.filename = filename
             with open(filename, 'r') as f:
                 read = json.load(f)
-                # read = pickle.load(f)
             for k, v in read.items():
                 self[k] = catbot(**v)
 
@@ -34,8 +33,6 @@ class file_backed_dict(dict):
             for k, v in self.items():
                 copy[k] = dataclasses.asdict(v)
             json.dump(copy, f, indent=4)
-            # pickle.dump(copy, f)
-            # pickle.dump(self, f)
 
     def __setitem__(self, key, value):
         super().__setitem__(key, value)
@@ -71,6 +68,11 @@ class catbot(bot):
         elif query == '我要申請[出差請示單]，我要掃描紙本公假單，後續給AI自己處理':
             return ('await outing img',
                     f"請[出差請示單]照片上傳給我喔~(heart)")
+        elif query == '我填了假單!':
+            from ngrok_autolaunch import cat_tunnel
+            requests.get(f'{cat_tunnel.public_url}/filewatch')
+            return ('named',
+                    f"我幫你看看呦!")
         elif query == '我要請假，我怕AI笨笨，我自己去填google表單':
             return ('named',
                     f"OK~ 表格在這裡，流水號記得寫紙本正面左上角喔: https://docs.google.com/forms/d/e/"
@@ -83,8 +85,8 @@ class catbot(bot):
             return 'named', f'{self.name}大大，拍謝~(cony cry)我聽不懂你說的"{query}"建議點擊預設動作'
 
     @transition_from('await holiday img')
-    def await_holiday_img(self, query: str, **kwargs):
-        got = requests.get(f'https://api-data.line.me/v2/bot/message/{kwargs["msgid"]}/content',
+    def await_holiday_img(self, query: str, msgid='?', **kwargs):
+        got = requests.get(f'https://api-data.line.me/v2/bot/message/{msgid}/content',
                            headers={"Authorization": f"Bearer {line_chan_acctoken}"}, stream=True)
         filename = datetime.now().strftime('%m%d-%H%M%S')
         with open(os.path.join('holiday_forms', filename + '.jpg'), 'wb') as f:
@@ -118,7 +120,6 @@ class catbot(bot):
          f"&entry.1813326080={filename}"
          f"&entry.286310740={self.id}"
          f"&entry.330405440={quote(self.name)}")
-
 
     @transition_from('waiting for msg')
     def await_msg(self, query: str, **kwargs):

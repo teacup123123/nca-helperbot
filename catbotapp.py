@@ -66,14 +66,28 @@ palette_Emojis = {
 }
 
 
-def handle_msg(event):
-    uid = event.source.user_id
+def handle_msg(event, **kwargs):
+    if isinstance(event, str):
+        assert re.match('\d{4}', event[:4])
+        get = [uid for uid, cb in catbot.userbase.items() if cb.id == event[:4]]
+        assert len(get) == 1
+        uid = get[0]
+        event = event[4:]
+    else:
+        uid = event.source.user_id
     if uid not in catbot.userbase:
         cbot = catbot.userbase[uid] = catbot.catbot()
     else:
         cbot = catbot.userbase[uid]
 
-    _, reply = cbot.handle(event.message.text if event.message.type == 'text' else 'IMG', msgid=event.message.id)
+    if isinstance(event, str):
+        if 'botmsg' in kwargs:
+            _, reply = cbot.handle(kwargs['botmsg'], **kwargs)
+        else:
+            reply = event
+    else:
+        _, reply = cbot.handle(event.message.text if event.message.type == 'text' else 'IMG',
+                               msgid=event.message.id, **kwargs)
     catbot.userbase[uid] = cbot  # force save
 
     reply: str
@@ -89,18 +103,12 @@ def handle_msg(event):
 
     with ApiClient(my_line_config) as api_client:
         line_bot_api = MessagingApi(api_client)
-        # line_bot_api.reply_message_with_http_info(
-        #     ReplyMessageRequest(
-        #         reply_token=event.reply_token,
-        #         messages=[TextMessage(text=reply, quoteToken=event.message.quote_token)]
-        #     )
-        # )
         line_bot_api.push_message_with_http_info(
-            PushMessageRequest(to=event.source.user_id,
+            PushMessageRequest(to=uid,
                                messages=[
                                    TextMessage(
                                        text=reply,
-                                       quoteToken=event.message.quote_token,
+                                       quoteToken=None if isinstance(event, str) else event.message.quote_token,
                                        emojis=used_emojis if used_emojis else None
                                    )
                                ])
@@ -124,24 +132,72 @@ import time
 # from datetime import datetime
 
 def subscribe():
-    ans = client.http_client.request(
-        method='POST',
-        endpoint='https://www.googleapis.com/drive/v3/files/1zmv-m-raCD8itLru9WxgEkdhZlmNZYm2-ud9fegWQnk/watch',
-        json={
-            "id": "holiday_form_watch",
-            "type": "web_hook",
-            "address": cat_tunnel.public_url + '/filewatch',
-            'expiration': int(time.time() * 1000) + 60 * 60 * 12
-        }
-    )
-    return ans
+    # try:
+    #     with open('secrets/resourceID.txt', 'r') as f:
+    #         resourceId = f.read(-1).strip()
+    #     response_clr = client.http_client.request(
+    #         method='POST',
+    #         endpoint='https://www.googleapis.com/drive/v3/channels/stop',
+    #         json={
+    #             "id": "holiday_form_watch",
+    #             "resourceId": resourceId
+    #         }
+    #     )
+    # except:
+    #     pass
+
+    try:
+        response = client.http_client.request(
+            method='POST',
+            endpoint='https://www.googleapis.com/drive/v3/files/1JwFcXcyNIch2vfmATGI55nTSFDYJ7EUC5l764svBb_4/watch',
+            json={
+                "id": "holiday_form_watch4",
+                "type": "web_hook",
+                "address": cat_tunnel.public_url + '/filewatch',
+                # 'expiration': int(time.time() * 1000) + 60 * 60 * 12
+            }
+        )
+        print(response)
+        print(response.content)
+        resourceId = json.loads(response.content)['resourceId']
+        with open('secrets/resourceID.txt', 'w') as f:
+            f.write(resourceId)
+    except:
+        pass
+
+
+holiday_old_timestamps = set()
+spreadsheet = client.open('holiday3')
+worksheet = spreadsheet.get_worksheet(0)
 
 
 @app.route("/filewatch", methods=['GET', 'POST'])
 def holiday_form_watcher():
-    # get request body as text
-    body = request.get_data(as_text=True)
-    print(f'holiday_watcher got {body}')
+    global holiday_old_timestamps
+    if 'X-Goog-Resource-State' not in request.headers:
+        g_resource_state = 'manual'
+    else:
+        g_resource_state = request.headers['X-Goog-Resource-State']
+    if g_resource_state == 'sync':
+        print("Syncing")
+        new_timestamps = set((x[0], i + 1) for i, x in enumerate(worksheet.get('A:A')))
+        assert ('Timestamp', 1) in new_timestamps
+        diff, holiday_old_timestamps = new_timestamps.difference(holiday_old_timestamps), new_timestamps
+        return 'OK'
+
+    new_timestamps = set((x[0], i + 1) for i, x in enumerate(worksheet.get('A:A')))
+    assert ('Timestamp', 1) in new_timestamps
+    diff, holiday_old_timestamps = new_timestamps.difference(holiday_old_timestamps), new_timestamps
+    if ('Timestamp', 1) in diff: return 'OK'
+    print("UPDATE!", diff)
+    if len(diff) == 0: return 'OK'
+    ids = [id[0][0] for id in worksheet.batch_get([f'C{x}' for _, x in diff])]
+    for id, (_ts, _) in zip(ids, diff):
+        msg = f'{_ts}填寫/修改的表單看見了!'
+        fabricated = f'{id}{msg}'
+        print(fabricated)
+        handle_msg(fabricated)
+
     return 'OK'
 
 
