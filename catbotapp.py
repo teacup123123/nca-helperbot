@@ -1,6 +1,7 @@
 import re
 
 from credentials import *
+from ngrok_autolaunch import *
 import json
 from flask import Flask, request, abort
 
@@ -17,6 +18,7 @@ from linebot.v3.messaging import (
     ReplyMessageRequest,
     PushMessageRequest,
     TextMessage,
+    ImageMessage,
     Emoji
 )
 from linebot.v3.webhooks import (
@@ -26,7 +28,7 @@ from linebot.v3.webhooks import (
 )
 
 app = Flask(__name__)
-app.config["public_url"] = public_url
+app.config["public_url"] = cat_tunnel.public_url
 my_line_config = Configuration(access_token=line_chan_acctoken)
 my_line_handler = WebhookHandler(line_chan_secret)
 
@@ -116,8 +118,8 @@ def handle_txt_message(event):
 
 if __name__ == '__main__':
     from waitress import serve
-
-    serve(app, host="0.0.0.0", port=private_port)
+    print(f'serving at port {cat_tunnel.localport}')
+    serve(app, host="0.0.0.0", port=cat_tunnel.localport)
     # app.run(host='0.0.0.0', port=private_port)
 
 # curl -v -X GET https://api-data.line.me/v2/bot/message/{messageId}/content \
