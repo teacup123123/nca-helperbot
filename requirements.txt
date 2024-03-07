@@ -9,3 +9,6 @@ google-generativeai
 pillow
 google-cloud-vision
 waitress
+selenium
+websocket
+websockets
