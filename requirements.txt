@@ -1,6 +1,5 @@
 requests
 line-bot-sdk
-flask
 pyngrok
 google-api-python-client
 oauth2client
@@ -12,3 +11,12 @@ waitress
 selenium
 websocket
 websockets
+flask[async]
+quart
+hypercorn
+python-decouple
+python-docx
+pypdf
+openpyxl
+pandas
+tabulate[widechars]
