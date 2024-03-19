@@ -3,6 +3,7 @@
 * 所有項數的分數加總是否總和為1, 預假核定時算新的項喔!
 """
 import re
+from collections import defaultdict
 
 import openpyxl as ox
 from openpyxl import Workbook
@@ -51,12 +52,17 @@ def sanitize(code, func, doprint=False):
 def verify_count():
     unique_denom = {}
     numrtr_left = {}
+    antiparticle_pair = defaultdict(int)
 
     def correct(name, val, ws, idx, **kwargs):
         showname = name.replace('預', '')
         totused = ws['G'][idx].value
         for l in val.splitlines():
             token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
+            if '預' in name:
+                antiparticle_pair[token] = 1 | antiparticle_pair[token]
+            elif '預' in token:
+                antiparticle_pair[token.replace('預', '')] = 2 | antiparticle_pair[token]
             assert d != '?'  # 沒有問號
             assert n != '?'  # 沒有問號
             n, d = map(int, (n, d))
@@ -72,7 +78,9 @@ def verify_count():
     sanitize('I', correct)
     for k, v in numrtr_left.items():
         assert v == 0  # if broken here, fraction doesn't add up to 1
-        # print(k, ' : n adds up to d')
+    for k, v in antiparticle_pair.items():
+        if not v in [0, 3]:
+            print(f"{k} 好像沒有 預假/核銷 都有")
 
 
 if __name__ == '__main__':
