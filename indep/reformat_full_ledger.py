@@ -13,12 +13,14 @@ import openpyxl as ox
 from openpyxl import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
-pattern_date3 = '(\d{3})(\d{2})(\d{2})'
-pattern_usage = '(\([\d/?]+\))'
-pattern_detectfrac = '\(([\d?]+)/([\d?]+)\)'
+pattern_date3 = r'(\d{3})(\d{2})(\d{2})'
+pattern_usage = r'(\([\d/?]+\))'
+pattern_detectfrac = r'\(([\d?]+)/([\d?]+)\)'
 
-shutil.copy('holiday_ledger/組改期間役男榮譽假清冊3.xlsx', 'holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx')
-wb: Workbook = ox.load_workbook('holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx')
+# shutil.copy('holiday_ledger/組改期間役男榮譽假清冊3.xlsx', 'holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx')
+
+target = r'D:\東區督考科業務\1.東區業務\組改期間榮譽假系統\組改期間役男榮譽假清冊自動化.xlsx'  # TODO
+wb: Workbook = ox.load_workbook(target)
 a2j = 'ABCDEFGHIJ'
 
 
@@ -100,7 +102,7 @@ def sanitize(code, func, doprint=False):
             if entry.value is None:
                 continue
             newval = func('預' + last_name if job.value is None else name.value, entry.value, ws=ws, idx=idx)
-            matches = re.findall('\([\d/?]+\)', newval)
+            matches = re.findall(r'\([\d/?]+\)', newval)
             assert all(sum(c == '/' for c in match) <= 1 for match in matches)
             if not (len(entry.value.splitlines()) == len(newval.splitlines()) == len(matches)):
                 print('PROBLEMOS')
@@ -121,13 +123,13 @@ def hasparanthesis(name, v, **kwargs):
     v = v.replace('(4)就解', '就解(4)')
     v = v.replace('(4) 就解', '就解(4)')
 
-    v = re.sub('\n', '', v)
-    if re.search('\)(\S)', v):
-        v = re.sub('\)(\S)', ')\n\g<1>', v)
-    if re.search('\)(\s+)', v):
-        v = re.sub('\)(\s+)', ')\n', v)
+    v = re.sub(r'\n', '', v)
+    if re.search(r'\)(\S)', v):
+        v = re.sub(r'\)(\S)', r')\n\g<1>', v)
+    if re.search(r'\)(\s+)', v):
+        v = re.sub(r'\)(\s+)', r')\n', v)
 
-    v = re.sub('\s+(\([\d/]+\))', '\g<1>', v)
+    v = re.sub(r'\s+(\([\d/]+\))', r'\g<1>', v)
     for _ in range(5):
         v = v.replace('  ', ' ')
         v = v.replace('-', '~')
@@ -139,79 +141,79 @@ def hasparanthesis(name, v, **kwargs):
     v = v.replace('晚(', '晚四(')
     v = v.replace('早(', '早四(')
     if re.search(pattern_date3, v):
-        v = re.sub(pattern_date3, '\g<1>/\g<2>/\g<3>', v)
+        v = re.sub(pattern_date3, r'\g<1>/\g<2>/\g<3>', v)
 
     reconstruct = []
     for s in v.splitlines():
         usage = re.search(pattern_usage, s).group(1)
-        token = re.sub('\([\d/?]+\)', '', s)
+        token = re.sub(r'\([\d/?]+\)', '', s)
 
         if '/' in usage:  # GOOD already fraction
             reconstruct.append(token + usage)
             continue
-        if re.match('\*[\S\d\ /~]+', token):  # GOOD 預假核銷
+        if re.match(r'\*[\S\d\ /~]+', token):  # GOOD 預假核銷
             reconstruct.append(token + usage)
             continue
         if any(keyword in token for keyword in '特 手 自 改 修'.split()):  # GOOD 手動
             reconstruct.append(token + usage)
             continue
-        if re.match('11\d/\d+/\d+ 全日八', token):  # GOOD
+        if re.match(r'11\d/\d+/\d+ 全日八', token):  # GOOD
             reconstruct.append(token + usage)
             continue
-        if re.fullmatch('11\d/\d+/\d+', token):
+        if re.fullmatch(r'11\d/\d+/\d+', token):
             reconstruct.append(token + ' 全日八' + usage)
             continue
-        if (m := re.match('(11\d/\d+/\d+) 0830~1730', token)):
+        if (m := re.match(r'(11\d/\d+/\d+) 0830~1730', token)):
             reconstruct.append(m.group(1) + ' 全日八' + usage)
             continue
-        if (m := re.match('(11\d/\d+/\d+) 0830~(11\d/\d+/\d+) 1730', token)) and m.group(1) == m.group(2):
+        if (m := re.match(r'(11\d/\d+/\d+) 0830~(11\d/\d+/\d+) 1730', token)) and m.group(1) == m.group(2):
             reconstruct.append(m.group(1) + ' 全日八' + usage)
             continue
 
-        if re.match('11\d/\d+/\d+~11\d/\d+/\d+ 多日', token):  # GOOD
+        if re.match(r'11\d/\d+/\d+~11\d/\d+/\d+ 多日', token):  # GOOD
             reconstruct.append(token + usage)
             continue
-        if re.fullmatch('11\d/\d+/\d+~11\d/\d+/\d+', token):
+        if re.fullmatch(r'11\d/\d+/\d+~11\d/\d+/\d+', token):
             reconstruct.append(token + ' 多日' + usage)
             continue
-        if re.match('11\d/\d+/\d+ 0830~11\d/\d+/\d+ 1730', token):
+        if re.match(r'11\d/\d+/\d+ 0830~11\d/\d+/\d+ 1730', token):
             reconstruct.append(token + ' 多日' + usage)
             continue
-        if re.match('11\d/\d+/\d+ 1330~11\d/\d+/\d+ 1330', token):
+        if re.match(r'11\d/\d+/\d+ 1330~11\d/\d+/\d+ 1330', token):
             reconstruct.append(token + ' 含半多日' + usage)
             # print(reconstruct[-1])
             continue
-        if re.fullmatch('11\d/\d+/\d+~\d+/\d+', token):
+        if re.fullmatch(r'11\d/\d+/\d+~\d+/\d+', token):
             reconstruct.append(token + ' 多日' + usage)
             continue
-        if re.fullmatch('11\d/\d+/\d+~\d+', token):
+        if re.fullmatch(r'11\d/\d+/\d+~\d+', token):
             reconstruct.append(token + ' 多日' + usage)
             continue
 
-        if (m := re.search('[早晚]四', token)):  # GOOD
+        if (m := re.search(r'[早晚]四', token)):  # GOOD
             reconstruct.append(token + usage)
             continue
         if '晚' in token and '晚四' not in token:
             reconstruct.append(token.replace('晚', '') + '晚四' + usage)
             continue
-        if (m := re.match('(11\d/\d+/\d+) 0830~1230', token)):
+        if (m := re.match(r'(11\d/\d+/\d+) 0830~1230', token)):
             reconstruct.append(m.group(1) + ' 早四' + usage)
             continue
-        if (m := re.match('(11\d/\d+/\d+) 0830~1230', token)):
+        if (m := re.match(r'(11\d/\d+/\d+) 0830~1230', token)):
             reconstruct.append(m.group(1) + ' 早四' + usage)
             continue
-        if (m := re.match('(11\d/\d+/\d+) 1330~1730', token)):
+        if (m := re.match(r'(11\d/\d+/\d+) 1330~1730', token)):
             reconstruct.append(m.group(1) + ' 晚四' + usage)
             continue
-        if (m := re.match('(11\d/\d+/\d+) (\d{4})~(\d{4}) 當日(\d)', token)):  # GOOD
+        if (m := re.match(r'(11\d/\d+/\d+) (\d{4})~(\d{4}) 當日(\d)', token)):  # GOOD
             reconstruct.append(token + usage)
             continue
-        if (m := re.match('(11\d/\d+/\d+) (\d{4})~(\d{4})', token)):
+        if (m := re.match(r'(11\d/\d+/\d+) (\d{4})~(\d{4})', token)):
             tot = (int(m.group(3)) - int(m.group(2))) // 100
             if int(m.group(2)) < 1245 < int(m.group(3)): tot -= 1  # 午休
             reconstruct.append(token + f' 當日{tot}' + usage)
             continue
-        if (m := re.match('(11\d/\d+/\d+) (\d{4})~(11\d/\d+/\d+) (\d{4})', token)):
+        if (m := re.match(r'(11\d/\d+/\d+) (\d{4})~(11\d/\d+/\d+) (\d{4})', token)):
             if m.group(1) == m.group(3):
                 tot = (int(m.group(4)) - int(m.group(2))) // 100
                 if int(m.group(2)) < 1245 < int(m.group(4)): tot -= 1  # 午休
@@ -247,7 +249,7 @@ def hasparanthesis(name, v, **kwargs):
 
     v = '\n'.join(reconstruct)
     for line in v.splitlines():
-        assert len(re.findall('11\d', line)) - len(re.findall('~', line)) <= 1
+        assert len(re.findall(r'11\d', line)) - len(re.findall(r'~', line)) <= 1
     return v
 
 
@@ -255,7 +257,7 @@ def compress(name, v, **kwargs):
     lines = []
     for line in v.splitlines():
         usage = re.search(pattern_usage, line).group(1)
-        token = re.sub('\([\d/?]+\)', '', line)
+        token = re.sub(r'\([\d/?]+\)', '', line)
         if '~' in token:
             fr, to = token.split('~')
             fr = fr.replace(' ', '//')
@@ -312,14 +314,14 @@ def precheck_confirm():
                             usage = '(?/8)'
                             special = False
                 elif '多日' in token or '含半多日' in token:
-                    if int(re.search('(\d+)', usage).group(1)) <= 8:
+                    if int(re.search(r'(\d+)', usage).group(1)) <= 8:
                         usage = f'{usage}/(?)'.replace(')/(', '/')
                         special = False
                     elif sawtimes[(name, token)] > 1 and len(sawusages[(name, token)]) == 1:
                         usage = f'(?)/{usage}'.replace(')/(', '/')
                         special = False
                 elif '當日' in token:
-                    tot = int(re.search('當日(\d)', token).group(1))
+                    tot = int(re.search(r'當日(\d)', token).group(1))
                     if tot == 1:
                         usage = '(1/1)'
                         special = False
@@ -375,7 +377,7 @@ def precheck_confirm():
         else:
             lines = []
             for l in usage_value.splitlines():
-                token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
+                token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac, l).groups()
                 if sawtimes[name, token] == 1:
                     if n == '?': n = d
                     if d == '?': d = n
@@ -390,14 +392,14 @@ def precheck_confirm():
     def preemptize(name, val, ws, idx):
         if name.startswith('預'):
             for l in val.splitlines():
-                token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
+                token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac, l).groups()
                 assert (name.replace('預', ''), token) not in coverage
                 coverage[(name.replace('預', ''), token)] = n
         else:
             lines = []
             for l in val.splitlines():
-                token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
-                token, usage = re.search('([\w\W]+)' + pattern_usage, l).groups()
+                token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac, l).groups()
+                token, usage = re.search(r'([\w\W]+)' + pattern_usage, l).groups()
                 assert '/' in usage
                 if (name, token) in coverage:
                     lines.append('*預' + token + f'({n}/{coverage[(name, token)]})')
@@ -413,7 +415,7 @@ def precheck_confirm():
     #     lines = []
     #     for line in val.splitlines():
     #         if '*預' in line:
-    #             token, n, d = re.search('([\w\W]+)' + pattern_detectfrac)
+    #             token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac)
     #             x = min(used.value,n)
     #             token2 = f'({x}/{n})'
     #         else:
@@ -435,12 +437,12 @@ def iter_solve(name, val, ws, idx, **kwargs):
     ns = []
     lines = []
     for l in val.splitlines():
-        token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
+        token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac, l).groups()
         ns.append(n)
     if sum(c == '?' for c in ns) == 1:
         for n in ns: tot -= (0 if n == '?' else int(n))
     for l in val.splitlines():
-        token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
+        token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac, l).groups()
         if n == '?': n = tot
         lines.append(
             re.sub(pattern_detectfrac, f'({n}/{d})', l)
@@ -454,13 +456,13 @@ def verify_count():
     def sum_count_n(name, val, ws, idx, **kwargs):
 
         for l in val.splitlines():
-            token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
+            token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac, l).groups()
             summation_n[(name.replace('預', ''), token)] += int(n) if n != '?' else math.nan
         return val
 
     def verif_count_n(name, val, ws, idx, **kwargs):
         for l in val.splitlines():
-            token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
+            token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac, l).groups()
             if d == '?' or summation_n[(name.replace('預', ''), token)] != int(d):
                 print('BUG @ ', name, l)
         return val
@@ -475,7 +477,7 @@ def verify_count():
         showname = name.replace('預', '')
         totused = ws['G'][idx].value
         for l in val.splitlines():
-            token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
+            token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac, l).groups()
             assert d != '?'
             assert n != '?'
             n, d = map(int, (n, d))
@@ -518,4 +520,5 @@ if __name__ == '__main__':
     verify_count()
     sanitize('I', has_unkown)
     # sanitize('I', is_singleton)
-    wb.save('holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx')
+    # wb.save('holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx')
+    wb.save(target)

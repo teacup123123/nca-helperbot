@@ -9,11 +9,12 @@ import openpyxl as ox
 from openpyxl import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
-pattern_date3 = '(\d{3})(\d{2})(\d{2})'
-pattern_usage = '(\([\d/?]+\))'
-pattern_detectfrac = '\(([\d?]+)/([\d?]+)\)'
+pattern_date3 = r'(\d{3})(\d{2})(\d{2})'
+pattern_usage = r'(\([\d/?]+\))'
+pattern_detectfrac = r'\(([\d?]+)/([\d?]+)\)'
 
-wb: Workbook = ox.load_workbook('holiday_ledger/組改期間役男榮譽假清冊3_改temp.xlsx')
+target = r'D:\東區督考科業務\1.東區業務\組改期間榮譽假系統\組改期間役男榮譽假清冊自動化.xlsx'  # TODO
+wb: Workbook = ox.load_workbook(target)
 a2j = 'ABCDEFGHIJ'
 
 
@@ -42,7 +43,7 @@ def sanitize(code, func, doprint=False):
             if entry.value is None:
                 continue
             newval = func('預' + last_name if job.value is None else name.value, entry.value, ws=ws, idx=idx)
-            matches = re.findall('\([\d/?]+\)', newval)
+            matches = re.findall(r'\([\d/?]+\)', newval)
             assert all(sum(c == '/' for c in match) <= 1 for match in matches)
             if not (len(entry.value.splitlines()) == len(newval.splitlines()) == len(matches)):
                 print('PROBLEMOS, reduction of lines!!')
@@ -58,11 +59,12 @@ def verify_count():
         showname = name.replace('預', '')
         totused = ws['G'][idx].value
         for l in val.splitlines():
-            token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
+            token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac, l).groups()
+            origtoken = token.replace('*預', '')
             if '預' in name:
-                antiparticle_pair[token] = 1 | antiparticle_pair[token]
+                antiparticle_pair[showname, origtoken] = 1 | antiparticle_pair[showname, origtoken]
             elif '預' in token:
-                antiparticle_pair[token.replace('預', '')] = 2 | antiparticle_pair[token]
+                antiparticle_pair[showname, origtoken] = 2 | antiparticle_pair[showname, origtoken]
             assert d != '?'  # 沒有問號
             assert n != '?'  # 沒有問號
             n, d = map(int, (n, d))
@@ -78,9 +80,9 @@ def verify_count():
     sanitize('I', correct)
     for k, v in numrtr_left.items():
         assert v == 0  # if broken here, fraction doesn't add up to 1
-    for k, v in antiparticle_pair.items():
+    for (showname, k), v in antiparticle_pair.items():
         if not v in [0, 3]:
-            print(f"{k} 好像沒有 預假/核銷 都有")
+            print(f"{showname} 的 {k} 好像沒有 預假/核銷 都有")
 
 
 if __name__ == '__main__':

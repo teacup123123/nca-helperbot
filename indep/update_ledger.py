@@ -19,13 +19,14 @@ import sys
 
 import pandas as pd
 
-target = 'holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx'
+# target = r'D:\東區督考科業務\1.東區業務\組改期間榮譽假系統\組改期間役男榮譽假清冊自動化.xlsx'  # TODO
+target = 'holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx'# TODO
 wb_global: Worksheet = None
 
 full_data = pd.read_pickle('Tdata_compiled/allT.pickle')
 
-pattern_detectfrac = '\(([\d?]+)/([\d?]+)\)'
-pattern_date3 = '(\d{3})/(\d+)/(\d+)'
+pattern_detectfrac = r'\(([\d?]+)/([\d?]+)\)'
+pattern_date3 = r'(\d{3})/(\d+)/(\d+)'
 
 
 def rows_no_header(ws):
@@ -56,7 +57,7 @@ def obtain_name(uid_or_name):
     if isinstance(uid_or_name, int):
         uid = int(uid_or_name)
         name = id2name(uid)
-    elif re.match('\d{3}\d?', uid_or_name):
+    elif re.match(r'\d{3}\d?', uid_or_name):
         uid = int(uid_or_name)
         name = id2name(uid)
     else:
@@ -65,7 +66,7 @@ def obtain_name(uid_or_name):
 
 
 def key(x):
-    exp = tuple(int(xx) for xx in re.findall('\d+', x[7])) if x[7] is not None else (111, 1, 1)
+    exp = tuple(int(xx) for xx in re.findall(r'\d+', x[7])) if x[7] is not None else (111, 1, 1)
     firstuse = x[8].splitlines()[0].replace('*預', '') if x[8] is not None else '120/1/1'
     lastuse = x[8].splitlines()[-1].replace('*預', '') if x[8] is not None else '120/1/1'
     # lastline = re.match(pattern_date3, lastline).groups()
@@ -102,7 +103,7 @@ def use_holiday(uid_or_name, timestring: str):
     :return:
     """
     timestring = timestring.replace('-', '~')
-    timestring = re.sub('(1\d{2})(\d{2})(\d{2})', '\g<1>/\g<2>/\g<3>', timestring)
+    timestring = re.sub(r'(1\d{2})(\d{2})(\d{2})', r'\g<1>/\g<2>/\g<3>', timestring)
 
     name = obtain_name(uid_or_name)
 
@@ -144,7 +145,7 @@ def use_holiday(uid_or_name, timestring: str):
 def add_holiday_quota(uid_or_name, hours: int, period: str, expiration: str, reason: str):
     name = obtain_name(uid_or_name)
     if not isinstance(hours, int): hours = int(hours)
-    _ = re.match('(\d{3})-?(\d{2})-?(\d{2})', expiration)
+    _ = re.match(r'(\d{3})-?(\d{2})-?(\d{2})', expiration)
     _ = _.groups()
     expiration = '{}-{:02}-{:02}'.format(*(int(x) for x in _))
 
@@ -158,13 +159,13 @@ def add_holiday_quota(uid_or_name, hours: int, period: str, expiration: str, rea
         if is_not_prempt:
             usage = r[8].value if r[8].value is not None else ''
             for l in usage.splitlines():
-                token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
+                token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac, l).groups()
                 if token.startswith('*預'): preempt[token] -= int(n)
         else:
             usage = r[8].value if r[8].value is not None else ''
             assert '\n' not in usage  # must be one line!!!
             l = usage
-            token, n, d = re.search('([\w\W]+)' + pattern_detectfrac, l).groups()
+            token, n, d = re.search(r'([\w\W]+)' + pattern_detectfrac, l).groups()
             preempt['*預' + token] += int(n)
             denom['*預' + token] = int(n)
     if all(v == 0 for v in preempt.values()):
@@ -226,6 +227,19 @@ def print_sheet(uid_or_name):
         rows.append([c.value for c in r])
 
     print(tabulate(rows, headers=[ws[f'{c}1'].value for c in 'ABCDEFGHIJ'], tablefmt='fancy_grid'))
+
+
+@interaction
+def calc_remainder(uid_or_name):
+    name = obtain_name(uid_or_name)
+    if wb_global is None: load()
+    ws = wb_global[name]
+    rows = []
+    left = 0
+    for r in rows_no_header(ws):
+        rows.append([c.value for c in r])
+        left += (r[5].value - r[6].value)
+    print(f'{name} has {left} hrs left')
 
 
 if __name__ == '__main__':

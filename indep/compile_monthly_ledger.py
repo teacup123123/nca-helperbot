@@ -68,8 +68,8 @@ def gen_hours(_workdays=None):
 workdays = gen_workdays()
 workhours, byworkday = gen_hours()
 
-pattern_date3 = '(\d{3})/(\d+)/(\d+)'
-pattern_detectfrac = '\(([\d?]+)/([\d?]+)\)'
+pattern_date3 = r'(\d{3})/(\d+)/(\d+)'
+pattern_detectfrac = r'\(([\d?]+)/([\d?]+)\)'
 
 
 def grab_till(token: str):
