@@ -11,12 +11,12 @@ import openpyxl as ox
 from openpyxl import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 
-pattern_date3 = '(\d{3})(\d{2})(\d{2})'
-pattern_usage = '(\([\d/?]+\))'
-pattern_detectfrac = '\(([\d?]+)/([\d?]+)\)'
+pattern_date3 = r'(\d{3})(\d{2})(\d{2})'
+pattern_usage = r'(\([\d/?]+\))'
+pattern_detectfrac = r'\(([\d?]+)/([\d?]+)\)'
 
 xls_file = 'holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx'
-out_file = 'holiday_ledger/組改期間役男榮譽假清冊3_改temp.xlsx'
+out_file = 'holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx'
 
 
 def inflate_before_northen_office(ordered_names):

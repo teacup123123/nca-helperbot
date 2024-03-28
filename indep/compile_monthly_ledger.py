@@ -7,8 +7,6 @@ from openpyxl import Workbook
 from openpyxl.worksheet.worksheet import Worksheet
 from datetime import date as Date, timedelta, datetime as Datetime, time as Time
 
-month_repre = Date(2024, 3, 15)  # 目標月份，取月中+-28日之請假事項
-
 
 def gen_workdays():
     start_date = Date(2024, 1, 1)  # TODO 所有工作日
@@ -41,7 +39,7 @@ def gen_workdays():
         if single_date not in set_holidays:
             # print(single_date.strftime("%Y-%m-%d"))
             work_days.append(single_date)
-    return work_days
+    return set(work_days)
 
 
 def gen_hours(_workdays=None):
@@ -74,22 +72,22 @@ pattern_detectfrac = r'\(([\d?]+)/([\d?]+)\)'
 
 def grab_till(token: str):
     timefr, timeto = 0, 2359
-    token = re.match('[\d/~\-\s]+\d', token).group(0)
+    token = re.match(r'[\d/~\-\s]+\d', token).group(0)
     _ = token.replace('-', '~').split('~')
     if len(_) == 2:
         fr, till = _
         fr = fr.replace('/', ' ').split()
         till = till.replace('/', ' ').split()
-        if re.match('\d{4}', fr[-1]):
+        if re.match(r'\d{4}', fr[-1]):
             timefr = int(fr[-1])
             fr.pop()
-        if re.match('\d{4}', till[-1]):
+        if re.match(r'\d{4}', till[-1]):
             timeto = int(till[-1])
             till.pop()
     else:
         fr, *till = _
         fr = fr.replace('/', ' ').split()
-        if re.match('\d{4}', fr[-1]):
+        if re.match(r'\d{4}', fr[-1]):
             timefr = int(fr[-1])
             fr.pop()
     fr = fr + [timefr]
@@ -99,11 +97,31 @@ def grab_till(token: str):
     fr, till = list(map(int, fr)), list(map(int, till))
     fr[-1] = Time(fr[-1] // 100, fr[-1] % 100)
     till[-1] = Time(till[-1] // 100, till[-1] % 100)
+
+    if '早四' in token:
+        if fr[-1] == Time(0, 0):
+            assert fr[-1] == Time(23, 59)
+            fr[-1] = Time(8, 30)
+            fr[-1] = Time(12, 30)
+        else:
+            assert Time(8, 0) <= fr[-1] <= Time(8, 44)
+    if '晚四' in token:
+        if fr[-1] == Time(0, 0):
+            assert fr[-1] == Time(23, 59)
+            fr[-1] = Time(13, 30)
+            fr[-1] = Time(17, 30)
+        else:
+            assert Time(13, 0) <= fr[-1] <= Time(13, 44)
+
     return fr, till
 
 
-if __name__ == '__main__':
-    wbsrc: Workbook = ox.load_workbook('holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx')
+month_repre = Date(2024, 3, 15)  # 目標月份，取月中+-28日之請假事項
+
+
+def compile_monthly(src='holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx',
+                    dst=None):
+    wbsrc: Workbook = ox.load_workbook(src)
     skipsheet = True
     seen = defaultdict(set)
     for worksheet in wbsrc.worksheets:  # worksheet 即分頁
@@ -123,7 +141,7 @@ if __name__ == '__main__':
                 # but may be distributed over many sources
                 # we must remove duplicates, we do this via the dict(name->set) 'seen'
                 if line.startswith('*預'): continue  # already used, we skip
-                token, n, yr2 = re.search('([\w\W]+)' + pattern_detectfrac, line).groups()
+                token, n, yr2 = re.search(r'([\w\W]+)' + pattern_detectfrac, line).groups()
                 yr, mn, dy = re.search(pattern_date3, token).groups()
                 date = tuple(int(x) for x in (yr, mn, dy))  # to number
                 seen[name].add((date, token, int(yr2)))
@@ -149,7 +167,7 @@ if __name__ == '__main__':
             yr = int(yr) + 1911
             yr2 = int(yr2) + 1911
             yr, mn, dy, yr2, mn2, dy2 = map(int, [yr, mn, dy, yr2, mn2, dy2])
-            # starttime = re.search('\d{4}', token)
+            # starttime = re.search(r'\d{4}', token)
             # if starttime: starttime = starttime.group(0)
 
             if any(x in token for x in '早四 晚四 當日'.split()) or not any(x in token for x in '-~'):
@@ -204,5 +222,8 @@ if __name__ == '__main__':
             dz, usage = usage // 8, usage % 8
             lines.append(f'{yr}/{mn:02}/{dy:02}:{dz}日{usage}時')
         enter_into.value = '\n'.join(sorted(lines))
-
-    wbdst.save(f'holiday_ledger/{month_repre.month}月請假清冊統整 孝丞製作_自動.xlsx')
+    if dst is None:
+        wbdst.save(f'holiday_ledger/{month_repre.month}月請假清冊統整 孝丞製作_自動.xlsx')
+    else:
+        wbdst.save(dst)
+    return

@@ -482,7 +482,7 @@ def verify_count():
             assert n != '?'
             n, d = map(int, (n, d))
             assert showname, token not in unique_denom or unique_denom[showname, token] == d
-            if (showname, token) not in numrtr_left:
+            if (showname, token) not in numrtr_left: # first time
                 numrtr_left[showname, token] = d - n
             else:
                 numrtr_left[showname, token] -= n
@@ -519,6 +519,4 @@ if __name__ == '__main__':
     sanitize('I', new_year2024)
     verify_count()
     sanitize('I', has_unkown)
-    # sanitize('I', is_singleton)
-    # wb.save('holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx')
     wb.save(target)

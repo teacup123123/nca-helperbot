@@ -1,14 +1,13 @@
 import collections
 
 from openpyxl.styles import PatternFill, Border, Side, Alignment, Protection, Font
-from datetime import date as Date
 import numpy as np
 from openpyxl import Workbook
 from openpyxl.worksheet.filters import AutoFilter
 from openpyxl.worksheet.worksheet import Worksheet
 import openpyxl as ox
 import re
-from datetime import date as Date, datetime as Datetime
+from datetime import date as Date, datetime as Datetime, timedelta as TimeDelta, time as Time
 from enum import Enum
 import compile_monthly_ledger as uml
 from interactions import interaction, start_interaction
@@ -16,16 +15,18 @@ from compile_monthly_ledger import workhours, grab_till
 # import prettytable as pt
 from tabulate import tabulate
 import sys
+import weekly.weekly as wk
 
 import pandas as pd
 
 # target = r'D:\東區督考科業務\1.東區業務\組改期間榮譽假系統\組改期間役男榮譽假清冊自動化.xlsx'  # TODO
-target = 'holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx'# TODO
+target = 'holiday_ledger/組改期間役男榮譽假清冊3_改.xlsx'  # TODO
 wb_global: Worksheet = None
 
 full_data = pd.read_pickle('Tdata_compiled/allT.pickle')
 
 pattern_detectfrac = r'\(([\d?]+)/([\d?]+)\)'
+pattern_detectparan = r'\(([\d?]+)\)'
 pattern_date3 = r'(\d{3})/(\d+)/(\d+)'
 
 
@@ -72,8 +73,8 @@ def key(x):
     # lastline = re.match(pattern_date3, lastline).groups()
     firstuse = tuple(-int(xx) for xx in re.match(pattern_date3, firstuse).groups())
     lastuse = tuple(-int(xx) for xx in re.match(pattern_date3, lastuse).groups())
-    comp = x[5] - x[6] == 0, exp, x[0] is not None, x[5] - x[6]
-    if x[5] - x[6] == 0:
+    comp = int(x[5]) - int(x[6]) == 0, exp, x[0] is not None, int(x[5]) - int(x[6])
+    if int(x[5]) - int(x[6]) == 0:
         cmp = 1, lastuse, '*預' not in x[8], x[0] is not None, firstuse, exp
         # 無空後, 快過期者先, 過期日期，預價先
     else:
@@ -142,6 +143,14 @@ def use_holiday(uid_or_name, timestring: str):
 
 
 @interaction
+def add_holiday_quota_auto3month(uid_or_name, hours: int, date_added: str, reason: str):
+    _ = re.match(r'(\d{3})-?(\d{2})-?(\d{2})', date_added)
+    y, m, d = _.groups()
+    expiration = f'{y}-{int(m) + 3:02}-{int(d):02}'
+    add_holiday_quota(uid_or_name, hours, date_added, expiration, reason)
+
+
+@interaction
 def add_holiday_quota(uid_or_name, hours: int, period: str, expiration: str, reason: str):
     name = obtain_name(uid_or_name)
     if not isinstance(hours, int): hours = int(hours)
@@ -187,6 +196,132 @@ def add_holiday_quota(uid_or_name, hours: int, period: str, expiration: str, rea
     print()
 
 
+binbydate = collections.defaultdict(set)  #
+holidaytypes = collections.defaultdict(set)
+workdays = uml.gen_workdays()
+
+
+def _compile_date(date: Date):
+    date = Datetime.strptime(date.strftime('%Y-%m-%d'), '%Y-%m-%d')
+    imminent_discharge = full_data[np.abs(full_data.discharge - date) < TimeDelta(days=2)]
+    if len(imminent_discharge):
+        print('IMMINENT DISCHARGE 即將退役!')
+        print(imminent_discharge)
+    remaining = full_data[full_data.discharge > Datetime.strptime(date.strftime('%Y-%m-%d'), '%Y-%m-%d')]
+
+    for name in filter(lambda x: x not in ['胡力元', '廖育佐'], remaining.name):
+        if wb_global is None: load()
+        ws: Worksheet = wb_global[name]
+
+        for cell, holidaytype in zip(ws['I'][1:], ws['D'][1:]):  # I是使用紀錄，1是跳掉開頭的"使用紀錄"
+            if cell.value is None: continue
+            content: str = cell.value
+            for li, line in enumerate(content.splitlines()):  # each line is one (partial usage of holiday)
+                if line.startswith('*預'): continue  # already used, we skip
+                _ = re.search(r'([\w\W]+)' + pattern_detectfrac, line)
+                if _ is None:
+                    print(f'unable to match!!: {name}{line}, trying simple paranthesis')
+                    _ = re.search(r'([\w\W]+)' + pattern_detectparan, line)
+                    token, n = _.groups()
+                    _lines = content.splitlines()
+                    _lines[li] += f'({n}/{n})'
+                    print(f'auto appending fraction ({n}/{n}) and repeating PLEASE CHECK THE FOLLOWING!!')
+                    print(_lines[li])
+                    content = '\n'.join(_lines)
+                    line = content.splitlines()[li]
+                    _ = re.search(r'([\w\W]+)' + pattern_detectfrac, line)
+
+                token, n, d = _.groups()
+
+                _fr, _to = grab_till(token)
+                yr, mn, dy, starttime = _fr
+                yr2, mn2, dy2, endtime = _to
+                yr = int(yr) + 1911
+                yr2 = int(yr2) + 1911
+                yr, mn, dy, yr2, mn2, dy2 = map(int, [yr, mn, dy, yr2, mn2, dy2])
+
+                _fr = Datetime.combine(Date(year=yr, month=mn, day=dy), starttime)
+                _to = Datetime.combine(Date(year=yr2, month=mn2, day=dy2), endtime)
+
+                dayz = []
+                d_ = Date(year=yr, month=mn, day=dy)
+                d_to = Date(year=yr2, month=mn2, day=dy2)
+                while d_ <= d_to:
+                    if d_ in workdays:
+                        dayz.append(d_)
+                    d_ += TimeDelta(days=1)
+
+                if holidaytype.value is None:
+                    holidaytypev = '預'
+                elif '預' in holidaytype.value:
+                    holidaytypev = '預'
+                elif '榮' in holidaytype.value:
+                    holidaytypev = '榮'
+                elif '補' in holidaytype.value:
+                    holidaytypev = '補'
+                elif '公' in holidaytype.value:
+                    holidaytypev = '公'
+                else:
+                    print(holidaytype.value)
+                    raise ValueError
+
+                for day in dayz:
+                    starttime = Time(17, 30)
+                    endtime = Time(8, 30)
+                    for t in wk.allday:
+                        if _fr < Datetime.combine(day, t) < _to:
+                            starttime = min(t, starttime)
+                            endtime = max(t, endtime)
+                    starttime = (Datetime.combine(day, starttime) - TimeDelta(minutes=15)).time()
+                    endtime = (Datetime.combine(day, endtime) + TimeDelta(minutes=45)).time()
+
+                    iso_signature = f'{starttime.hour:02}:{starttime.minute:02}-{endtime.hour:02}:{endtime.minute:02}'
+
+                    binbydate[day].add((name, iso_signature))
+                    holidaytypes[(day, name, iso_signature)].add(holidaytypev)
+                    # print((day, name, signature, holidaytypev))
+
+
+@interaction
+def compile_weekdays(datestr: str):
+    try:
+        yr, mn, dy, yr2, mn2, dy2 = re.match(r'(\d{3})-?(\d{2})-?(\d{2})[\-~]](\d{3})-?(\d{2})-?(\d{2})',
+                                             datestr).groups()
+        yr, mn, dy = map(int, [yr, mn, dy])
+        yr2, mn2, dy2 = map(int, [yr2, mn2, dy2])
+        if yr < 1911: yr += 1911
+        if yr2 < 1911: yr2 += 1911
+        start = Date(yr, mn, dy)
+        end = Date(yr2, mn2, dy2)
+        while start <= end:
+            compile_weekday(f'{start.year - 1911}{start.month:02}{start.day:02}')
+            start += TimeDelta(days=1)
+
+    except:
+        compile_weekday(datestr)
+
+
+def compile_weekday(datestr: str):
+    yr, mn, dy = re.match(r'(\d{3})-?(\d{2})-?(\d{2})', datestr).groups()
+    yr = int(yr)
+    if yr < 1911: yr += 1911
+    yr, mn, dy = map(int, [yr, mn, dy])
+    date = Date(yr, mn, dy)
+
+    if len(binbydate) == 0:
+        _compile_date(date)
+        print('compiled binbydate')
+
+    absence = binbydate[date]
+    with wk.prepare(date) as f:
+        for name, iso_signature in absence:
+            holiday_type = '+'.join(holidaytypes[(date, name, iso_signature)])
+            f.add(name, full_data[full_data.name == name].dorm.iloc[0], holiday_type, iso_signature)
+
+    date.weekday()
+    print('END of compile_weekday')
+
+
 @interaction
 def refresh_format(uid_or_name):
     name = obtain_name(uid_or_name)
@@ -224,7 +359,7 @@ def print_sheet(uid_or_name):
     ws = wb_global[name]
     rows = []
     for r in rows_no_header(ws):
-        rows.append([c.value for c in r])
+        rows.append([c.value for ic, c in enumerate(r) if ic < 10])
 
     print(tabulate(rows, headers=[ws[f'{c}1'].value for c in 'ABCDEFGHIJ'], tablefmt='fancy_grid'))
 
